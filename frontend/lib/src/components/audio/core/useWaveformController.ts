@@ -85,6 +85,11 @@ export function useWaveformController({
   const initGenerationRef = useRef(0)
   const readyResolversRef = useRef<Set<ReadyResolver>>(new Set())
   const isPlaybackModeRef = useRef(false)
+  // The container element that WaveSurfer was last initialized with.
+  // When the layout switches (e.g. textarea expands), ChatInput unmounts and
+  // remounts the waveform div, replacing the DOM node. We track it here so
+  // initializeWaveSurfer can detect the replacement and reinitialize.
+  const mountedContainerRef = useRef<HTMLDivElement | null>(null)
 
   // Use the provided sample rate if specified; if undefined, fall back to DEFAULT_SAMPLE_RATE; if null, use null.
   const effectiveSampleRate =
@@ -114,6 +119,7 @@ export function useWaveformController({
     initPromiseRef.current = null
     initGenerationRef.current += 1
     isPlaybackModeRef.current = false
+    mountedContainerRef.current = null
     setCurrentState("idle")
     setCurrentBlob(null)
   }, [])
@@ -179,7 +185,17 @@ export function useWaveformController({
 
   const initializeWaveSurfer = useCallback((): Promise<void> => {
     if (isInitializedRef.current) {
-      return Promise.resolve()
+      // If the waveform div was unmounted and remounted (e.g. ChatInput's layout
+      // switched from expanded-toolbar to inline-recording), containerRef.current
+      // is a brand-new element. WaveSurfer is still bound to the old detached node
+      // and would draw into it invisibly. Tear down and reinitialize against the
+      // new element so the waveform is visible again. Fixes #17528.
+      if (containerRef.current !== mountedContainerRef.current) {
+        destroy()
+        // fall through to reinitialize below
+      } else {
+        return Promise.resolve()
+      }
     }
     if (initPromiseRef.current) {
       return initPromiseRef.current
@@ -188,6 +204,7 @@ export function useWaveformController({
     if (!container) {
       return Promise.resolve()
     }
+    mountedContainerRef.current = container
 
     const generation = initGenerationRef.current
     const initPromise = (async (): Promise<void> => {
