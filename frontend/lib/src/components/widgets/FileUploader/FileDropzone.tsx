@@ -27,6 +27,8 @@ import BaseButton, {
 } from "~lib/components/shared/BaseButton/BaseButton"
 import { DynamicButtonLabel } from "~lib/components/shared/BaseButton/DynamicButtonLabel"
 
+import { getFilesFromDropEvent } from "~lib/util/getFilesFromDropEvent"
+
 import FileDropzoneInstructions from "./FileDropzoneInstructions"
 import {
   StyledButtonNoWrapContainer,
@@ -68,6 +70,9 @@ const FileDropzone = ({
     // react-dropzone v12+ uses the File System Access API by default,
     // causing the bug described in https://github.com/streamlit/streamlit/issues/6176.
     useFsAccessApi={false}
+    // Use the Entry API for folder traversal to avoid Chrome's FSA blocklist
+    // that silently drops .ini, .cfg, .lnk and other extensions (#17234).
+    getFilesFromEvent={getFilesFromDropEvent}
   >
     {({ getRootProps, getInputProps, isDragActive }) => {
       const inputProps: DropzoneInputProps = getInputProps({

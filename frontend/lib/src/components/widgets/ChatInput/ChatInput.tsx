@@ -70,6 +70,7 @@ import useWidgetManagerElementState from "~lib/hooks/useWidgetManagerElementStat
 import { ScriptRunState } from "~lib/ScriptRunState"
 import { convertRemToPx } from "~lib/theme/utils"
 import { FileSize, sizeConverter } from "~lib/util/FileHelper"
+import { getFilesFromDropEvent } from "~lib/util/getFilesFromDropEvent"
 import { isEnterKeyPressed } from "~lib/util/inputUtils"
 import {
   AcceptFileValue,
@@ -664,6 +665,9 @@ function ChatInput({
     // Disable the File System Access API to avoid browser-specific issues
     // with drag-and-drop uploads (see issue #6176 and FileDropzone usage).
     useFsAccessApi: false,
+    // Use the Entry API for folder traversal to avoid Chrome's FSA blocklist
+    // that silently drops .ini, .cfg, .lnk and other extensions (#17234).
+    getFilesFromEvent: getFilesFromDropEvent,
   })
 
   const submitChatInput = useCallback(
