@@ -864,18 +864,26 @@ def _get_or_create_outside_wrapper(
     # rerun (not a full app rerun). If the container was created by one of
     # the currently-running fragments, its cursor is valid and we can safely
     # allocate a new wrapper (e.g. a child fragment writing into a container
-    # owned by its parent fragment during the parent's rerun). Otherwise the
-    # container's creating scope hasn't run, so we can't reserve a slot.
+    # owned by its parent fragment during the parent's rerun).
+    #
+    # Containers created in the main script (creating_fragment_id=None) are
+    # also safe: their cursor was frozen after the last full run at a valid
+    # position, and advancing it here does not affect the next full run (which
+    # creates fresh cursors). Only containers owned by a *sibling fragment
+    # that is not currently running* are unsafe, because that fragment's
+    # cursor may be in an indeterminate state.
     if ctx.fragment_ids_this_run and (
-        dg._creating_fragment_id not in ctx.fragment_ids_this_run
+        dg._creating_fragment_id is not None
+        and dg._creating_fragment_id not in ctx.fragment_ids_this_run
     ):
         raise StreamlitInvalidLayoutContextError(
-            "A fragment tried to write to a container created outside the "
-            "fragment, but that container was not written to during the initial "
-            "run, so Streamlit could not reserve a stable position for it.\n\n"
-            "Write to the container at least once during the full app run (e.g. "
-            "claim the slot with `outside.empty()`), then fill it during fragment "
-            "reruns."
+            "A fragment tried to write to a container that was created by "
+            "another fragment which is not currently running. Streamlit cannot "
+            "safely reserve a position for this write because the owning "
+            "fragment's cursor is in an indeterminate state.\n\n"
+            "To share a container between fragments, create it in the main app "
+            "script (outside all fragments), then write to it from whichever "
+            "fragment needs it."
         )
 
     parent_cursor = cast("Cursor", dg._cursor)

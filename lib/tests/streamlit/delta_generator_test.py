@@ -1606,19 +1606,42 @@ class OutsideWrapperCreationTest(DeltaGeneratorTestCase):
         assert wrapper_b is not None
         assert wrapper_a.creation_delta_path != wrapper_b.creation_delta_path
 
-    def test_fragment_only_rerun_without_prior_write_raises(self) -> None:
-        """If the outside container was never written to during a full app run, a
-        fragment-only rerun raises.
+    def test_fragment_only_rerun_main_script_container_allowed(self) -> None:
+        """A fragment may write to a main-script container during a standalone
+        rerun even if the container was never written to during the full run.
+        Main-script containers have a stable cursor frozen at the end of the
+        last full run, so creating a wrapper is safe.  Regression for #17563.
         """
         outside = st.container()
         self.script_run_ctx.fragment_ids_this_run = ["frag"]
         _enter_fragment(self)
 
+        # Must not raise — wrapper should be created successfully.
+        outside.markdown("hi")
+
+        wrapper = self.script_run_ctx.fragment_storage.get_outside_wrapper(
+            "frag", outside._id
+        )
+        assert wrapper is not None
+
+    def test_fragment_only_rerun_sibling_fragment_container_raises(self) -> None:
+        """Writing to a container owned by a sibling fragment (not currently
+        running) must still raise, because that fragment's cursor is
+        indeterminate during the standalone rerun.
+        """
+        _enter_fragment(self, fragment_id="sibling_frag")
+        sibling_container = st.container()
+        ThreadState.update(fragment_id=None, delta_path=None)
+
+        # Only "frag" is running — "sibling_frag" is not.
+        self.script_run_ctx.fragment_ids_this_run = ["frag"]
+        _enter_fragment(self, fragment_id="frag")
+
         with pytest.raises(
             StreamlitInvalidLayoutContextError,
-            match="could not reserve a stable position",
+            match="created by another fragment",
         ):
-            outside.markdown("hi")
+            sibling_container.markdown("hi")
 
     def test_fragment_rerun_allows_wrapper_for_container_created_by_running_fragment(
         self,
