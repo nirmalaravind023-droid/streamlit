@@ -158,9 +158,15 @@ function TriggerArea({
   )
 
   const { focusWithinProps } = useFocusWithin({
-    onFocusWithin() {
-      hasFocusWithinRef.current = true
-      if (!disabled) state?.open(true)
+    onFocusWithin(e) {
+      // Only treat keyboard focus (:focus-visible) as "focus held".
+      // Mouse clicks and programmatic focus restoration (e.g. when a dialog
+      // closes and returns focus to the opener) must not open the tooltip or
+      // pin it open, because the user's pointer is no longer near the button.
+      const isKeyboardFocus =
+        (e.target as Element).matches?.(":focus-visible") ?? true
+      hasFocusWithinRef.current = isKeyboardFocus
+      if (!disabled && isKeyboardFocus) state?.open(true)
     },
     onBlurWithin() {
       hasFocusWithinRef.current = false
